@@ -1,0 +1,17 @@
+{
+  "name": "Mise",
+  "short_name": "Mise",
+  "description": "Organize receitas e siga o modo de execução com cronograma e alertas de tempo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f1",
+  "theme_color": "#2f5443",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
