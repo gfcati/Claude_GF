@@ -25,7 +25,14 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  // Navegações de página (incluindo as que envolvem redirect, como
+  // /auth/callback e o proxy de sessão) sempre vão direto pra rede: um
+  // fetch() com redirect já seguido dentro do service worker é recusado
+  // pelo Safari para respostas de navegação ("Response served by service
+  // worker has redirections").
+  if (event.request.method !== "GET" || event.request.mode === "navigate") {
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => cached ?? fetch(event.request)),
   );

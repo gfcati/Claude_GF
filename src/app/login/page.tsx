@@ -5,9 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle",
   );
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -17,26 +20,70 @@ export default function LoginPage() {
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
+    if (error) console.error("signInWithOtp failed:", error);
     setStatus(error ? "error" : "sent");
+  }
+
+  async function handleVerifyCode(event: React.FormEvent) {
+    event.preventDefault();
+    setVerifying(true);
+    setVerifyError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: "email",
+    });
+    if (error) {
+      console.error("verifyOtp failed:", error);
+      setVerifyError("Código inválido ou expirado. Tente reenviar.");
+      setVerifying(false);
+      return;
+    }
+    // Navegação completa (não client-side): garante que o proxy leia o
+    // cookie de sessão recém-criado antes de decidir a rota.
+    window.location.assign("/");
   }
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6 rounded-lg border border-border bg-surface p-8">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold text-accent">
-            Mise
-          </h1>
-          <p className="mt-1 text-sm text-foreground/70">
-            Entre com seu e-mail para acessar suas receitas.
-          </p>
-        </div>
+        <p className="text-sm text-foreground/70">
+          Entre com seu e-mail para acessar suas receitas.
+        </p>
 
         {status === "sent" ? (
-          <p className="text-sm">
-            Enviamos um link de acesso para <strong>{email}</strong>. Confira
-            sua caixa de entrada.
-          </p>
+          <div className="space-y-4">
+            <p className="text-sm">
+              Enviamos um link e um código de acesso para{" "}
+              <strong>{email}</strong>.
+            </p>
+            <p className="text-xs text-foreground/60">
+              Se o link não funcionar (ex.: abriu em outro app no celular),
+              digite abaixo o código de 6 dígitos que veio no mesmo e-mail.
+            </p>
+            <form onSubmit={handleVerifyCode} className="space-y-3">
+              <input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                placeholder="Código de 6 dígitos"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
+              />
+              <button
+                type="submit"
+                disabled={verifying}
+                className="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-60"
+              >
+                {verifying ? "Confirmando..." : "Confirmar código"}
+              </button>
+              {verifyError && (
+                <p className="text-sm text-alert">{verifyError}</p>
+              )}
+            </form>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
             <input

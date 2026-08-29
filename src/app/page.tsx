@@ -18,9 +18,7 @@ export default async function RecipesPage() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
       <header className="mb-8 flex items-center justify-between">
-        <h1 className="font-serif text-3xl font-semibold text-accent">
-          Mise
-        </h1>
+        <h1 className="font-serif text-2xl font-semibold">Minhas receitas</h1>
         <div className="flex gap-2">
           <Link
             href="/recipes/import"
