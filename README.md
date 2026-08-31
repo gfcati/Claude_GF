@@ -4,6 +4,9 @@ Esqueleto do app descrito no PRD "Mise" — organização de receitas com cronog
 de execução guiada, checklist e alertas de tempo. Stack: Next.js (App Router) +
 Supabase (Postgres, Auth, RLS), conforme a seção 12 do PRD.
 
+Deploy em produção: push para `main` publica automaticamente via integração
+Git da Vercel (projeto `mise-app`).
+
 ## Rodando localmente
 
 ### 1. Crie um projeto no Supabase
