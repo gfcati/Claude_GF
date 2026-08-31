@@ -17,13 +17,25 @@ as $$
   select unaccent(input)
 $$;
 
+-- array_to_string(anyarray, text) também é STABLE (não IMMUTABLE) no
+-- Postgres — mesmo problema, mesma solução: um wrapper que assume que o
+-- resultado não muda pra um dado array de texto.
+create or replace function public.tags_text(tags text[])
+returns text
+language sql
+immutable
+parallel safe
+as $$
+  select array_to_string(tags, ' ')
+$$;
+
 -- Índices trigram (busca por substring, tolerante a maiúsculas/acentos) —
 -- é isso que mantém a busca rápida conforme o número de receitas cresce.
 create index recipes_title_trgm_idx
   on public.recipes using gin (public.unaccented(lower(title)) gin_trgm_ops);
 
 create index recipes_tags_trgm_idx
-  on public.recipes using gin (public.unaccented(lower(array_to_string(tags, ' '))) gin_trgm_ops);
+  on public.recipes using gin (public.unaccented(lower(public.tags_text(tags))) gin_trgm_ops);
 
 create index recipe_ingredients_name_trgm_idx
   on public.recipe_ingredients using gin (public.unaccented(lower(name)) gin_trgm_ops);
@@ -45,7 +57,7 @@ as $$
   where r.user_id = auth.uid()
     and (
       public.unaccented(lower(r.title)) ilike '%' || public.unaccented(lower(search_term)) || '%'
-      or public.unaccented(lower(array_to_string(r.tags, ' '))) ilike '%' || public.unaccented(lower(search_term)) || '%'
+      or public.unaccented(lower(public.tags_text(r.tags))) ilike '%' || public.unaccented(lower(search_term)) || '%'
       or public.unaccented(lower(ri.name)) ilike '%' || public.unaccented(lower(search_term)) || '%'
     )
   order by r.created_at desc
