@@ -114,23 +114,30 @@ function parseIsoDuration(value: unknown): number | null {
   return hours * 60 + minutes;
 }
 
+// Palavras longas vêm antes das abreviações de uma letra (kg, ml, g, l) na
+// alternância: a regex casa a primeira opção que bater no começo da string
+// restante, não a mais longa — "l" antes de "liters" faria "l" "vencer" e
+// deixar "iters" grudado no nome do ingrediente.
 const INGREDIENT_LINE =
-  /^\s*([\d.,/]+)?\s*(g|kg|ml|l|xícaras?|colheres?\s+de\s+sopa|colheres?\s+de\s+chá|unidades?|dentes?|cup|cups|tbsp|tsp|oz|lb)?\s*(?:de\s+)?(.+)$/i;
+  /^\s*([\d.,/]+)?\s*(kilograms?|kilos?|quilos?|grams?|milliliters?|millilitres?|liters?|litres?|teaspoons?|tablespoons?|xícaras?|colher(?:es)?\s+de\s+sopa|colher(?:es)?\s+de\s+chá|unidades?|dentes?|cups?|tbsp|tsp|oz|lb|kg|ml|g|l)?\s*(?:de\s+)?(.+)$/i;
 
 function parseIngredients(value: unknown): DraftIngredient[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((line): line is string => typeof line === "string" && line.trim().length > 0)
-    .map((line) => {
-      const match = line.match(INGREDIENT_LINE);
-      if (!match) return { name: line, quantity: null, unit: null };
-      const [, quantityRaw, unit, name] = match;
-      return {
-        name: name.trim(),
-        quantity: quantityRaw ? parseFraction(quantityRaw) : null,
-        unit: unit ? unit.trim() : null,
-      };
-    });
+    .map(parseIngredientLine);
+}
+
+/** Parses a single free-text ingredient line, e.g. "2 xícaras de farinha". */
+export function parseIngredientLine(line: string): DraftIngredient {
+  const match = line.match(INGREDIENT_LINE);
+  if (!match) return { name: line, quantity: null, unit: null };
+  const [, quantityRaw, unit, name] = match;
+  return {
+    name: name.trim(),
+    quantity: quantityRaw ? parseFraction(quantityRaw) : null,
+    unit: unit ? unit.trim() : null,
+  };
 }
 
 function parseFraction(raw: string): number | null {
