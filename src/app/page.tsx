@@ -2,18 +2,26 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { Recipe } from "@/lib/types";
 
-export default async function RecipesPage() {
+export default async function RecipesPage({ searchParams }: PageProps<"/">) {
+  const { q } = await searchParams;
+  const query = typeof q === "string" ? q.trim() : "";
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: recipes } = await supabase
-    .from("recipes")
-    .select("*")
-    .eq("user_id", user?.id)
-    .order("created_at", { ascending: false })
-    .returns<Recipe[]>();
+  // .rpc() não tem tipos gerados do schema (não usamos `Database` genérico
+  // no client), então encadear `.returns<T>()` nele confunde o supabase-js;
+  // fazemos o cast uma vez no resultado já mesclado das duas branches.
+  const { data: rawRecipes } = query
+    ? await supabase.rpc("search_recipes", { search_term: query })
+    : await supabase
+        .from("recipes")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+  const recipes = (rawRecipes ?? null) as Recipe[] | null;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
@@ -27,6 +35,12 @@ export default async function RecipesPage() {
             Importar de URL
           </Link>
           <Link
+            href="/recipes/import-text"
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface"
+          >
+            Colar texto
+          </Link>
+          <Link
             href="/recipes/new"
             className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground"
           >
@@ -35,10 +49,35 @@ export default async function RecipesPage() {
         </div>
       </header>
 
+      <form action="/" className="mb-6 flex gap-2">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="Buscar por título, tag ou ingrediente..."
+          className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface"
+        >
+          Buscar
+        </button>
+        {query && (
+          <Link
+            href="/"
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface"
+          >
+            Limpar
+          </Link>
+        )}
+      </form>
+
       {!recipes || recipes.length === 0 ? (
         <p className="text-sm text-foreground/70">
-          Nenhuma receita ainda. Importe uma de um link ou cadastre a
-          primeira manualmente.
+          {query
+            ? `Nenhuma receita encontrada para "${query}".`
+            : "Nenhuma receita ainda. Importe uma de um link, cole o texto de uma receita que você já tem, ou cadastre a primeira manualmente."}
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
