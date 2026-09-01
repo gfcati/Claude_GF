@@ -44,15 +44,43 @@ O Supabase free tier não tem backup automático. Para não depender só disso:
 # Em .env.local, além das variáveis acima:
 # SUPABASE_DB_URL=postgresql://postgres:SENHA@db.SEU-PROJETO.supabase.co:5432/postgres
 # (Project Settings → Database → Connection string → URI, com a senha do banco)
+#
+# Sem saída IPv6 na sua rede, use a aba "Session pooler" da mesma tela em vez
+# de "Direct connection" (o host direto do Supabase é IPv6-only sem o add-on
+# de IPv4) — dá timeout em vez de conectar. Não use "Transaction pooler".
 
 npm run backup
 ```
 
 Gera um dump em `backups/mise-<data>.dump` (fora do git — são dados pessoais).
-Para restaurar num projeto novo: `pg_restore --no-owner --dbname="$SUPABASE_DB_URL" backups/mise-<data>.dump`.
-Requer `pg_dump`/`pg_restore` no PATH (`brew install libpq && brew link --force libpq`
-no macOS). Rode isso periodicamente à mão, ou considere o plano Pro do
-Supabase, que já inclui backups diários automáticos.
+Requer `pg_dump`/`pg_restore` da **mesma versão major do servidor** (o Postgres
+do Supabase costuma ser a 17.x — `brew install postgresql@17` no macOS; se já
+tiver outra versão linkada, exporte o PATH antes: `export
+PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"`). Rode isso periodicamente
+à mão, ou considere o plano Pro do Supabase, que já inclui backups diários
+automáticos.
+
+### Restaurando um backup
+
+O dump inclui o cluster inteiro, com os schemas internos do Supabase (`auth`,
+`storage`, `realtime`...). Restaurar tudo de uma vez pode conflitar com o que
+a própria Supabase já gerencia — por isso, restaure só o schema `public`
+(onde ficam as receitas):
+
+```bash
+pg_restore --schema=public --clean --if-exists --no-owner \
+  --dbname="$SUPABASE_DB_URL" backups/mise-<data>.dump
+```
+
+- `--clean --if-exists` apaga as tabelas/índices/funções atuais do `public`
+  antes de recriar a partir do backup — isso **substitui** os dados atuais
+  pelos do backup, não mescla. Qualquer receita criada depois da data daquele
+  dump se perde.
+- Serve tanto pra desfazer um erro no projeto atual quanto pra recuperar tudo
+  num projeto Supabase novo (criado do zero) — não precisa rodar as
+  migrações antes, o dump já recria as tabelas, índices e funções sozinho.
+  Só aponte o `SUPABASE_DB_URL` pro projeto novo (connection string do
+  Session pooler dele) antes de rodar.
 
 ## O que já funciona
 
