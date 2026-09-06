@@ -45,13 +45,28 @@ function playAudio(kind: "beep" | "alarm") {
 
 // Chamar a partir de um handler de clique/toque (ex.: "Iniciar timer") pra
 // desbloquear a reprodução de áudio no Safari antes que algum alerta precise tocar
-// sozinho depois (via setTimeout), sem gesto do usuário.
+// sozinho depois (via setTimeout), sem gesto do usuário. O desbloqueio no iOS é por
+// elemento — destravar o beep não destrava o alarme — então os dois precisam passar
+// por isso. Toca mudo pra esse "play" de desbloqueio não vazar som audível.
 function unlockAudio() {
-  try {
-    const audio = getAudio("beep");
-    audio?.play().then(() => audio.pause()).catch(() => {});
-  } catch {
-    // ignora
+  for (const kind of ["beep", "alarm"] as const) {
+    const audio = getAudio(kind);
+    if (!audio) continue;
+    try {
+      audio.muted = true;
+      audio
+        .play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+        })
+        .catch(() => {
+          audio.muted = false;
+        });
+    } catch {
+      // ignora
+    }
   }
 }
 
