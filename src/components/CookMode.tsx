@@ -39,6 +39,190 @@ function notify(title: string, body: string) {
   }
 }
 
+type StoredTimer = { endAt: number; remainingMs: number; running: boolean };
+
+function timerStorageKey(stepId: string) {
+  return `mise:timer:${stepId}`;
+}
+
+function loadTimer(stepId: string): StoredTimer | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(timerStorageKey(stepId));
+    return raw ? (JSON.parse(raw) as StoredTimer) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveTimer(stepId: string, timer: StoredTimer | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (timer) {
+      window.localStorage.setItem(timerStorageKey(stepId), JSON.stringify(timer));
+    } else {
+      window.localStorage.removeItem(timerStorageKey(stepId));
+    }
+  } catch {
+    // localStorage indisponível (modo privado etc.) — timer só vive em memória.
+  }
+}
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function StepTimer({
+  stepId,
+  durationMinutes,
+  description,
+  isDone,
+}: {
+  stepId: string;
+  durationMinutes: number;
+  description: string;
+  isDone: boolean;
+}) {
+  const [timer, setTimer] = useState<StoredTimer | null>(() => loadTimer(stepId));
+  const [now, setNow] = useState(() => Date.now());
+  // Passo concluído força o timer a parar, sem precisar sincronizar `timer` via setState.
+  const effectiveTimer = isDone ? null : timer;
+
+  useEffect(() => {
+    if (isDone) saveTimer(stepId, null);
+  }, [isDone, stepId]);
+
+  // Re-render a cada segundo enquanto o timer roda, para atualizar o MM:SS exibido.
+  useEffect(() => {
+    if (!effectiveTimer?.running) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [effectiveTimer?.running]);
+
+  // Dispara o alarme no horário certo; usar setTimeout (mesmo com delay 0) em vez de
+  // checar e disparar direto no corpo do efeito também cobre o caso do iOS ter
+  // suspendido a aba em segundo plano: ao montar de novo com `endAt` já no passado,
+  // o alarme dispara no próximo tick em vez de nunca disparar.
+  useEffect(() => {
+    if (!effectiveTimer?.running) return;
+    const remaining = effectiveTimer.endAt - Date.now();
+    const id = setTimeout(() => {
+      notify("Tempo esgotado", description);
+      saveTimer(stepId, null);
+      setTimer(null);
+    }, Math.max(0, remaining));
+    return () => clearTimeout(id);
+  }, [effectiveTimer?.running, effectiveTimer?.endAt, stepId, description]);
+
+  // Mantém a tela acesa enquanto um timer estiver rodando (importante em iPad/iPhone).
+  useEffect(() => {
+    if (!effectiveTimer?.running) return;
+    if (!("wakeLock" in navigator)) return;
+
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    async function acquire() {
+      try {
+        sentinel = await navigator.wakeLock.request("screen");
+      } catch {
+        // Falhou (ex.: aba em segundo plano) — o timer continua funcionando sem isso.
+      }
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible" && !cancelled) acquire();
+    }
+
+    acquire();
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibility);
+      sentinel?.release().catch(() => {});
+    };
+  }, [effectiveTimer?.running]);
+
+  function start() {
+    const durationMs = timer?.remainingMs ?? durationMinutes * 60_000;
+    const next: StoredTimer = {
+      endAt: Date.now() + durationMs,
+      remainingMs: durationMs,
+      running: true,
+    };
+    setTimer(next);
+    setNow(Date.now());
+    saveTimer(stepId, next);
+  }
+
+  function pause() {
+    if (!timer?.running) return;
+    const remainingMs = Math.max(0, timer.endAt - Date.now());
+    const next: StoredTimer = { ...timer, remainingMs, running: false };
+    setTimer(next);
+    saveTimer(stepId, next);
+  }
+
+  function cancel() {
+    setTimer(null);
+    saveTimer(stepId, null);
+  }
+
+  if (isDone) return null;
+
+  const remainingMs = timer
+    ? timer.running
+      ? Math.max(0, timer.endAt - now)
+      : timer.remainingMs
+    : durationMinutes * 60_000;
+
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <span className="font-mono text-sm tabular-nums">{formatCountdown(remainingMs)}</span>
+      {!timer && (
+        <button
+          type="button"
+          onClick={start}
+          className="rounded-md border border-border px-2 py-1 text-xs font-medium"
+        >
+          Iniciar timer
+        </button>
+      )}
+      {timer?.running && (
+        <>
+          <button
+            type="button"
+            onClick={pause}
+            className="rounded-md border border-border px-2 py-1 text-xs font-medium"
+          >
+            Pausar
+          </button>
+          <button type="button" onClick={cancel} className="text-xs text-foreground/60 underline">
+            Cancelar
+          </button>
+        </>
+      )}
+      {timer && !timer.running && (
+        <>
+          <button
+            type="button"
+            onClick={start}
+            className="rounded-md border border-border px-2 py-1 text-xs font-medium"
+          >
+            Retomar
+          </button>
+          <button type="button" onClick={cancel} className="text-xs text-foreground/60 underline">
+            Cancelar
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[] }) {
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [rows, setRows] = useState<RowState[]>([]);
@@ -251,6 +435,12 @@ export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[
                   {row.actualStart &&
                     ` · real ${timeFmt.format(row.actualStart)}${row.actualEnd ? `–${timeFmt.format(row.actualEnd)}` : ""}`}
                 </p>
+                <StepTimer
+                  stepId={row.step.id}
+                  durationMinutes={row.step.duration_minutes}
+                  description={row.step.description}
+                  isDone={isDone}
+                />
               </div>
             </li>
           );
