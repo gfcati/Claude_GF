@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  env: {
+    // Exibido no rodapé pra dar certeza de qual deploy está no ar — a Vercel
+    // preenche VERCEL_GIT_COMMIT_SHA sozinha em todo build, sem precisar
+    // habilitar a exposição automática de env vars do sistema.
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 7),
+  },
 };
 
 export default nextConfig;

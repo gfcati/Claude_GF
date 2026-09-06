@@ -48,6 +48,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </Link>
         </header>
         {children}
+        <footer className="px-6 py-3 text-center font-mono text-xs text-foreground/40">
+          build {process.env.NEXT_PUBLIC_BUILD_SHA}
+        </footer>
       </body>
     </html>
   );
