@@ -297,36 +297,13 @@ export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[
     };
   }, []);
 
-  function scheduleAlertsFor(row: RowState, executionStart: Date) {
+  function scheduleAlertsFor(row: RowState) {
     const existing = timers.current.get(row.step.id);
     existing?.forEach(clearTimeout);
     if (row.actualEnd) return;
 
     const nowMs = new Date().getTime();
     const newTimers: ReturnType<typeof setTimeout>[] = [];
-
-    if (row.plannedStart.getTime() > executionStart.getTime()) {
-      const delay = row.plannedStart.getTime() - nowMs;
-      if (delay > 0) {
-        newTimers.push(
-          setTimeout(
-            () => notify("Hora de começar", `Passo: ${row.step.description}`),
-            delay,
-          ),
-        );
-      }
-    }
-
-    const endingSoonAt = row.plannedEnd.getTime() - 2 * 60_000;
-    const endingSoonDelay = endingSoonAt - nowMs;
-    if (endingSoonDelay > 0) {
-      newTimers.push(
-        setTimeout(
-          () => notify("Faltam 2 minutos", row.step.description),
-          endingSoonDelay,
-        ),
-      );
-    }
 
     const overdueDelay = row.plannedEnd.getTime() - nowMs;
     if (overdueDelay > 0) {
@@ -364,7 +341,7 @@ export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[
       };
     });
     setRows(nextRows);
-    nextRows.forEach((row) => scheduleAlertsFor(row, startAt));
+    nextRows.forEach((row) => scheduleAlertsFor(row));
 
     const supabase = createClient();
     const {
@@ -418,7 +395,7 @@ export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[
     );
     const replanned = replan(withCompletion, executionStart);
     setRows(replanned);
-    replanned.forEach((row) => scheduleAlertsFor(row, executionStart));
+    replanned.forEach((row) => scheduleAlertsFor(row));
 
     if (!executionId) return;
     const supabase = createClient();
