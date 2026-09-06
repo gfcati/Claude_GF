@@ -15,28 +15,60 @@ type RowState = {
 
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
+// Um AudioContext único e reaproveitado: no iOS/Safari, cada `new AudioContext()`
+// nasce suspenso e só toca de verdade depois de um `resume()` disparado por um gesto
+// do usuário (toque em botão). Criar um contexto novo a cada beep, como antes, nunca
+// chegava a desbloquear — por isso não tocava nada real no iPad.
+let sharedAudioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
+  try {
+    if (!sharedAudioContext) sharedAudioContext = new AudioContext();
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
+
+// Chamar a partir de um handler de clique/toque (ex.: "Iniciar timer") pra desbloquear
+// o áudio no iOS antes que algum alarme precise tocar sozinho, sem gesto do usuário.
+function unlockAudio() {
+  getAudioContext()?.resume().catch(() => {});
+}
+
+function playBeepAt(ctx: AudioContext, whenSeconds: number) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = 880;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0.8, whenSeconds);
+  osc.start(whenSeconds);
+  osc.stop(whenSeconds + 0.35);
+}
+
 function playBeep() {
   try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = 880;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
-    osc.onended = () => ctx.close();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    playBeepAt(ctx, ctx.currentTime);
   } catch {
     // Web Audio indisponível — o alerta visual/de notificação ainda funciona.
   }
 }
 
 function playAlarm() {
-  const beepCount = 4;
-  const intervalMs = 500;
-  for (let i = 0; i < beepCount; i++) {
-    setTimeout(playBeep, i * intervalMs);
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const beepCount = 4;
+    const intervalSeconds = 0.5;
+    for (let i = 0; i < beepCount; i++) {
+      playBeepAt(ctx, ctx.currentTime + i * intervalSeconds);
+    }
+  } catch {
+    // Web Audio indisponível — o alerta visual/de notificação ainda funciona.
   }
 }
 
@@ -159,6 +191,7 @@ function StepTimer({
   }, [effectiveTimer?.running]);
 
   function start() {
+    unlockAudio();
     const durationMs = timer?.remainingMs ?? durationMinutes * 60_000;
     const next: StoredTimer = {
       endAt: Date.now() + durationMs,
@@ -308,6 +341,7 @@ export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[
   }
 
   async function handleStart(startAt: Date) {
+    unlockAudio();
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       await Notification.requestPermission();
     }
