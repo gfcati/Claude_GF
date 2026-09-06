@@ -44,6 +44,52 @@ export function RecipeForm({
     }));
   }
 
+  function insertIngredientAt(index: number) {
+    setDraft((d) => {
+      const ingredients = [...d.ingredients];
+      ingredients.splice(index, 0, { name: "", quantity: null, unit: null });
+      return { ...d, ingredients };
+    });
+  }
+
+  function removeIngredientAt(index: number) {
+    setDraft((d) => ({
+      ...d,
+      ingredients: d.ingredients.filter((_, i) => i !== index),
+    }));
+  }
+
+  // Insere um passo em branco na posição `index`, ajustando `starts_with_index` dos
+  // demais passos para que continuem apontando para o mesmo passo de antes (que pode
+  // ter deslocado de posição).
+  function insertStepAt(index: number) {
+    setDraft((d) => {
+      const steps = d.steps.map((s) =>
+        s.starts_with_index !== null && s.starts_with_index >= index
+          ? { ...s, starts_with_index: s.starts_with_index + 1 }
+          : s,
+      );
+      steps.splice(index, 0, { description: "", duration_minutes: 5, starts_with_index: null });
+      return { ...d, steps };
+    });
+  }
+
+  // Remove o passo em `index`; quem apontava pra ele em `starts_with_index` volta a
+  // ser sequencial (null), e quem apontava pra passos depois dele é reajustado.
+  function removeStepAt(index: number) {
+    setDraft((d) => ({
+      ...d,
+      steps: d.steps
+        .map((s) => {
+          if (s.starts_with_index === null) return s;
+          if (s.starts_with_index === index) return { ...s, starts_with_index: null };
+          if (s.starts_with_index > index) return { ...s, starts_with_index: s.starts_with_index - 1 };
+          return s;
+        })
+        .filter((_, i) => i !== index),
+    }));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -209,7 +255,7 @@ export function RecipeForm({
           </button>
         </div>
         {draft.ingredients.map((ing, index) => (
-          <div key={index} className="flex gap-2">
+          <div key={index} className="flex items-center gap-2">
             <input
               placeholder="Quantidade"
               type="number"
@@ -233,6 +279,22 @@ export function RecipeForm({
               onChange={(e) => updateIngredient(index, { name: e.target.value })}
               className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
             />
+            <button
+              type="button"
+              onClick={() => insertIngredientAt(index + 1)}
+              title="Inserir ingrediente abaixo"
+              className="px-1 text-sm text-accent"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => removeIngredientAt(index)}
+              title="Remover ingrediente"
+              className="px-1 text-sm text-alert"
+            >
+              ×
+            </button>
           </div>
         ))}
       </section>
@@ -304,6 +366,20 @@ export function RecipeForm({
                   </select>
                 </label>
               )}
+              <button
+                type="button"
+                onClick={() => insertStepAt(index + 1)}
+                className="ml-auto text-xs text-accent underline"
+              >
+                + inserir abaixo
+              </button>
+              <button
+                type="button"
+                onClick={() => removeStepAt(index)}
+                className="text-xs text-alert underline"
+              >
+                remover
+              </button>
             </div>
           </div>
         ))}
