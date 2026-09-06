@@ -32,8 +32,20 @@ function playBeep() {
   }
 }
 
-function notify(title: string, body: string) {
-  playBeep();
+function playAlarm() {
+  const beepCount = 4;
+  const intervalMs = 500;
+  for (let i = 0; i < beepCount; i++) {
+    setTimeout(playBeep, i * intervalMs);
+  }
+}
+
+function notify(title: string, body: string, options?: { alarm?: boolean }) {
+  if (options?.alarm) {
+    playAlarm();
+  } else {
+    playBeep();
+  }
   if (typeof Notification !== "undefined" && Notification.permission === "granted") {
     new Notification(title, { body, icon: "/icons/icon.svg" });
   }
@@ -110,7 +122,7 @@ function StepTimer({
     if (!effectiveTimer?.running) return;
     const remaining = effectiveTimer.endAt - Date.now();
     const id = setTimeout(() => {
-      notify("Tempo esgotado", description);
+      notify("Tempo esgotado", description, { alarm: true });
       saveTimer(stepId, null);
       setTimer(null);
     }, Math.max(0, remaining));
