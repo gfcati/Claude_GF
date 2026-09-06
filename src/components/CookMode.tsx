@@ -15,61 +15,52 @@ type RowState = {
 
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-// Um AudioContext único e reaproveitado: no iOS/Safari, cada `new AudioContext()`
-// nasce suspenso e só toca de verdade depois de um `resume()` disparado por um gesto
-// do usuário (toque em botão). Criar um contexto novo a cada beep, como antes, nunca
-// chegava a desbloquear — por isso não tocava nada real no iPad.
-let sharedAudioContext: AudioContext | null = null;
+// Arquivos de áudio de verdade (em vez de tons gerados via Web Audio API): no
+// Safari/iOS, a chavinha física de silencioso muda o Web Audio API, mas não afeta
+// elementos <audio> — é o único jeito confiável de tocar som mesmo com o aparelho
+// no silencioso. https://bugs.webkit.org/show_bug.cgi?id=237322
+let beepAudio: HTMLAudioElement | null = null;
+let alarmAudio: HTMLAudioElement | null = null;
 
-function getAudioContext(): AudioContext | null {
-  if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
+function getAudio(kind: "beep" | "alarm"): HTMLAudioElement | null {
+  if (typeof window === "undefined" || typeof Audio === "undefined") return null;
+  if (kind === "beep") {
+    if (!beepAudio) beepAudio = new Audio("/sounds/beep.wav");
+    return beepAudio;
+  }
+  if (!alarmAudio) alarmAudio = new Audio("/sounds/alarm.wav");
+  return alarmAudio;
+}
+
+function playAudio(kind: "beep" | "alarm") {
   try {
-    if (!sharedAudioContext) sharedAudioContext = new AudioContext();
-    return sharedAudioContext;
+    const audio = getAudio(kind);
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
   } catch {
-    return null;
+    // Áudio indisponível — o alerta visual/de notificação ainda funciona.
   }
 }
 
-// Chamar a partir de um handler de clique/toque (ex.: "Iniciar timer") pra desbloquear
-// o áudio no iOS antes que algum alarme precise tocar sozinho, sem gesto do usuário.
+// Chamar a partir de um handler de clique/toque (ex.: "Iniciar timer") pra
+// desbloquear a reprodução de áudio no Safari antes que algum alerta precise tocar
+// sozinho depois (via setTimeout), sem gesto do usuário.
 function unlockAudio() {
-  getAudioContext()?.resume().catch(() => {});
-}
-
-function playBeepAt(ctx: AudioContext, whenSeconds: number) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.frequency.value = 880;
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  gain.gain.setValueAtTime(0.8, whenSeconds);
-  osc.start(whenSeconds);
-  osc.stop(whenSeconds + 0.35);
+  try {
+    const audio = getAudio("beep");
+    audio?.play().then(() => audio.pause()).catch(() => {});
+  } catch {
+    // ignora
+  }
 }
 
 function playBeep() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    playBeepAt(ctx, ctx.currentTime);
-  } catch {
-    // Web Audio indisponível — o alerta visual/de notificação ainda funciona.
-  }
+  playAudio("beep");
 }
 
 function playAlarm() {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const beepCount = 4;
-    const intervalSeconds = 0.5;
-    for (let i = 0; i < beepCount; i++) {
-      playBeepAt(ctx, ctx.currentTime + i * intervalSeconds);
-    }
-  } catch {
-    // Web Audio indisponível — o alerta visual/de notificação ainda funciona.
-  }
+  playAudio("alarm");
 }
 
 function notify(title: string, body: string, options?: { alarm?: boolean }) {
