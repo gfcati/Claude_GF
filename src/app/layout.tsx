@@ -43,7 +43,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ServiceWorkerRegistration />
         <header className="border-b border-border px-6 py-3">
-          <Link href="/" className="font-serif text-lg font-semibold text-accent">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent/10 px-3 py-1.5 font-serif text-lg font-semibold text-accent transition-colors hover:bg-accent/20"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-5"
+            >
+              <path d="M3 11.5 12 4l9 7.5" />
+              <path d="M5.5 9.5V20h13V9.5" />
+            </svg>
             Mise
           </Link>
         </header>
