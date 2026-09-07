@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { MakeAllPublicButton } from "@/components/MakeAllPublicButton";
 import type { Recipe } from "@/lib/types";
 
 export default async function RecipesPage({ searchParams }: PageProps<"/">) {
@@ -27,7 +28,8 @@ export default async function RecipesPage({ searchParams }: PageProps<"/">) {
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="font-serif text-2xl font-semibold">Minhas receitas</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {!query && recipes && recipes.length > 0 && <MakeAllPublicButton />}
           <Link
             href="/recipes/import"
             className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-surface"
