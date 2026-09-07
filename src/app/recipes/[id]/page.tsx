@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
 import { ShareRecipe } from "@/components/ShareRecipe";
+import { SaveRecipeButton } from "@/components/SaveRecipeButton";
 import type { Recipe, RecipeIngredient, RecipeStep } from "@/lib/types";
 
 export default async function RecipeDetailPage({
@@ -50,7 +51,7 @@ export default async function RecipeDetailPage({
             {recipe.servings ? ` · ${recipe.servings} porções` : ""}
           </p>
         </div>
-        {isOwner && (
+        {isOwner ? (
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <ShareRecipe recipeId={id} isPublic={recipe.is_public} />
             <Link
@@ -61,6 +62,8 @@ export default async function RecipeDetailPage({
             </Link>
             <DeleteRecipeButton recipeId={id} />
           </div>
+        ) : (
+          <SaveRecipeButton recipeId={id} />
         )}
       </div>
 
