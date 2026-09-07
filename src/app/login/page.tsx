@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+// Só aceita um caminho relativo do próprio site (nunca uma URL de outro domínio)
+// — evita que um link malicioso com ?next=https://... redirecione pra fora do
+// mise logo depois do usuário se autenticar de verdade.
+function safeNextPath(): string {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -41,8 +50,9 @@ export default function LoginPage() {
       return;
     }
     // Navegação completa (não client-side): garante que o proxy leia o
-    // cookie de sessão recém-criado antes de decidir a rota.
-    window.location.assign("/");
+    // cookie de sessão recém-criado antes de decidir a rota. Volta pra página
+    // que pediu o login (ex.: a receita compartilhada), não sempre pra home.
+    window.location.assign(safeNextPath());
   }
 
   return (
