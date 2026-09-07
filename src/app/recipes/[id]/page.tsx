@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DeleteRecipeButton } from "@/components/DeleteRecipeButton";
+import { ShareRecipe } from "@/components/ShareRecipe";
 import type { Recipe, RecipeIngredient, RecipeStep } from "@/lib/types";
 
 export default async function RecipeDetailPage({
@@ -12,13 +13,13 @@ export default async function RecipeDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: recipe } = await supabase
-    .from("recipes")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle<Recipe>();
+  const [{ data: recipe }, { data: userData }] = await Promise.all([
+    supabase.from("recipes").select("*").eq("id", id).maybeSingle<Recipe>(),
+    supabase.auth.getUser(),
+  ]);
 
   if (!recipe) notFound();
+  const isOwner = userData.user?.id === recipe.user_id;
 
   const [{ data: ingredients }, { data: steps }] = await Promise.all([
     supabase
@@ -49,15 +50,18 @@ export default async function RecipeDetailPage({
             {recipe.servings ? ` · ${recipe.servings} porções` : ""}
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Link
-            href={`/recipes/${id}/edit`}
-            className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface"
-          >
-            Editar
-          </Link>
-          <DeleteRecipeButton recipeId={id} />
-        </div>
+        {isOwner && (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <ShareRecipe recipeId={id} isPublic={recipe.is_public} />
+            <Link
+              href={`/recipes/${id}/edit`}
+              className="rounded-md border border-border px-3 py-2 text-sm hover:bg-surface"
+            >
+              Editar
+            </Link>
+            <DeleteRecipeButton recipeId={id} />
+          </div>
+        )}
       </div>
 
       <Link

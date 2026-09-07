@@ -11,12 +11,13 @@ export default async function EditRecipePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: recipe } = await supabase
-    .from("recipes")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle<Recipe>();
-  if (!recipe) notFound();
+  const [{ data: recipe }, { data: userData }] = await Promise.all([
+    supabase.from("recipes").select("*").eq("id", id).maybeSingle<Recipe>(),
+    supabase.auth.getUser(),
+  ]);
+  // notFound() em vez de redirecionar pra manter o mesmo comportamento de uma
+  // receita inexistente — quem não é dono não deveria nem saber que ela existe aqui.
+  if (!recipe || userData.user?.id !== recipe.user_id) notFound();
 
   const [{ data: ingredients }, { data: steps }] = await Promise.all([
     supabase
