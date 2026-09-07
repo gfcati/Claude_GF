@@ -16,10 +16,10 @@ export default function LoginPage() {
     event.preventDefault();
     setStatus("sending");
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
+    // Sem `emailRedirectTo`: só o código de 6 dígitos, sem link mágico — o link
+    // dava problema ao abrir num app/navegador diferente de onde foi pedido
+    // (o verificador PKCE fica preso à aba que iniciou o pedido).
+    const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) console.error("signInWithOtp failed:", error);
     setStatus(error ? "error" : "sent");
   }
@@ -55,12 +55,7 @@ export default function LoginPage() {
         {status === "sent" ? (
           <div className="space-y-4">
             <p className="text-sm">
-              Enviamos um link e um código de acesso para{" "}
-              <strong>{email}</strong>.
-            </p>
-            <p className="text-xs text-foreground/60">
-              Se o link não funcionar (ex.: abriu em outro app no celular),
-              digite abaixo o código de 6 dígitos que veio no mesmo e-mail.
+              Enviamos um código de acesso para <strong>{email}</strong>.
             </p>
             <form onSubmit={handleVerifyCode} className="space-y-3">
               <input
@@ -99,11 +94,11 @@ export default function LoginPage() {
               disabled={status === "sending"}
               className="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-60"
             >
-              {status === "sending" ? "Enviando..." : "Enviar link de acesso"}
+              {status === "sending" ? "Enviando..." : "Enviar código de acesso"}
             </button>
             {status === "error" && (
               <p className="text-sm text-alert">
-                Não foi possível enviar o link. Tente novamente.
+                Não foi possível enviar o código. Tente novamente.
               </p>
             )}
           </form>
