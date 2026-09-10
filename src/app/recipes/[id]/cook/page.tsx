@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CookMode } from "@/components/CookMode";
-import type { Recipe, RecipeStep } from "@/lib/types";
+import type { Recipe, RecipeIngredient, RecipeStep } from "@/lib/types";
 
 export default async function CookPage({
   params,
@@ -19,12 +19,20 @@ export default async function CookPage({
     .maybeSingle<Recipe>();
   if (!recipe) notFound();
 
-  const { data: steps } = await supabase
-    .from("recipe_steps")
-    .select("*")
-    .eq("recipe_id", id)
-    .order("position")
-    .returns<RecipeStep[]>();
+  const [{ data: steps }, { data: ingredients }] = await Promise.all([
+    supabase
+      .from("recipe_steps")
+      .select("*")
+      .eq("recipe_id", id)
+      .order("position")
+      .returns<RecipeStep[]>(),
+    supabase
+      .from("recipe_ingredients")
+      .select("*")
+      .eq("recipe_id", id)
+      .order("position")
+      .returns<RecipeIngredient[]>(),
+  ]);
 
   if (!steps || steps.length === 0) {
     return (
@@ -45,7 +53,7 @@ export default async function CookPage({
       <h1 className="mb-6 font-serif text-2xl font-semibold text-accent">
         {recipe.title}
       </h1>
-      <CookMode recipe={recipe} steps={steps} />
+      <CookMode recipe={recipe} steps={steps} ingredients={ingredients ?? []} />
     </main>
   );
 }

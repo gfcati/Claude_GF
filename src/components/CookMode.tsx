@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { computeSchedule, type StepProgress } from "@/lib/scheduling";
-import type { Recipe, RecipeStep } from "@/lib/types";
+import type { Recipe, RecipeIngredient, RecipeStep } from "@/lib/types";
 
 type RowState = {
   step: RecipeStep;
@@ -274,7 +274,46 @@ function StepTimer({
   );
 }
 
-export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[] }) {
+function IngredientsAccordion({ ingredients }: { ingredients: RecipeIngredient[] }) {
+  const [open, setOpen] = useState(false);
+
+  if (ingredients.length === 0) return null;
+
+  return (
+    <div className="rounded-md border border-border">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
+      >
+        Ingredientes
+        <span className="text-foreground/60">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <ul className="space-y-1 border-t border-border px-3 py-2 text-sm">
+          {ingredients.map((ing) => (
+            <li key={ing.id}>
+              {ing.quantity ? `${ing.quantity} ` : ""}
+              {ing.unit ? `${ing.unit} ` : ""}
+              {ing.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function CookMode({
+  recipe,
+  steps,
+  ingredients,
+}: {
+  recipe: Recipe;
+  steps: RecipeStep[];
+  ingredients: RecipeIngredient[];
+}) {
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [rows, setRows] = useState<RowState[]>([]);
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>[]>>(new Map());
@@ -428,11 +467,17 @@ export function CookMode({ recipe, steps }: { recipe: Recipe; steps: RecipeStep[
   }
 
   if (rows.length === 0) {
-    return <StartForm onStart={handleStart} />;
+    return (
+      <div className="space-y-6">
+        <IngredientsAccordion ingredients={ingredients} />
+        <StartForm onStart={handleStart} />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      <IngredientsAccordion ingredients={ingredients} />
       <ol className="space-y-3">
         {rows.map((row) => {
           const isDone = Boolean(row.actualEnd);
